@@ -61,7 +61,7 @@ public class GameState {
 		Position highest_concentration = null;
 		double value = -1;
 		GameMap game_map = game.gameMap;
-		for(int i = 0; i < game_map.height; ++i){
+		for(int i = 0; i < game_map.width; ++i){
 			for(int j = 0; j < game_map.height; ++j){
 				Position pos = new Position(i, j);
 				int temp_distance = game_map.calculateDistance(from, game_map.normalize(new Position(pos.x + Hardcoded.FOCUS_SIZE/2, pos.y + Hardcoded.FOCUS_SIZE/2)));
@@ -127,11 +127,24 @@ public class GameState {
         }
         
         int buffer = 0;
-        if(game.turnNumber >= Constants.MAX_TURNS*(Hardcoded.TURN_DROPOFF_MULTIPLIER)) {
+        if(game.turnNumber >= Hardcoded.DROPPOINT_SAVE_TURN_MULTIPLIER * (Hardcoded.DROPPOINT_SAVE_TURN_NUMERATOR/game.gameMap.width)) {
         	buffer = Constants.DROPOFF_COST;
         }
+        
+        int total_ships = 0;
+       	for(Player player : game.players) {
+       		total_ships += player.ships.size();
+       	}
+       	
+       	int total_halite = 0;
+		for(int i = 0; i < game.gameMap.width; ++i){
+			for(int j = 0; j < game.gameMap.height; ++j){
+				total_halite += game.gameMap.at(new Position(i, j)).halite;
+			}
+		}
 
         if (
+        	(total_halite / (total_ships+1)) >= (1.5*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 100) / 100)) &&
             game.turnNumber <= Constants.MAX_TURNS * Hardcoded.LAST_SPAWN_TURN_MULTIPLIER &&
             ship_controllers.size() <= (Constants.MAX_TURNS - Hardcoded.MAX_BOT_NUMBER_SUBTRACTOR) * Hardcoded.MAX_BOT_NUMBER_MULTIPLIER &&
             game.me.halite >= Constants.SHIP_COST  + buffer &&

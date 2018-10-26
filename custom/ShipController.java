@@ -3,6 +3,7 @@ package custom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 
 import hlt.Command;
@@ -18,6 +19,8 @@ public class ShipController {
 	State state;
 	Position focus_position;
 	HashMap<Direction, Integer> directions_order;
+	int halite_gains_total;
+	LinkedList<Integer> recent_gains;
 	
 	enum State 
 	{ 
@@ -52,6 +55,9 @@ public class ShipController {
 		Log.log("new ship with id: " + ship.id);
 		update(ship);
 		state = State.GATHERING;
+		halite_gains_total = 0;
+		recent_gains = new LinkedList<>();
+		
 		setDirectionsOrder();
 	}
 	
@@ -92,6 +98,12 @@ public class ShipController {
 	public Command getCommand(GameState game_state) {
 		Log.log("id: " + ship.id + ", position: " + ship.position.toString() + ", halite: " + ship.halite + ", state: " + state);
 		Direction best_direction;
+		
+		if(state != State.GATHERING) {
+			recent_gains.clear();
+			halite_gains_total = 0;
+		}
+		
 		if(state == State.STUCK) {
 			best_direction = Direction.STILL;
 		}else {
@@ -202,11 +214,33 @@ public class ShipController {
 					}
 				}
 				
-				if(total_near >= Hardcoded.DROPPOINT_SPAWN_TARGET) {
+				int near_halite = 0;
+				int rad = Hardcoded.DROPPOINT_SPAWN_RADIUS;
+				for(int x = 0; x < rad; ++ x) {
+					for(int y = 0; y < rad; ++y) {
+						near_halite += game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x - rad/2,final_pos.y + y - rad/2))).halite;
+					}
+				}
+				
+				if(total_near >= Hardcoded.DROPPOINT_SPAWN_TARGET || (total_near >= 1 && (near_halite / (rad*rad)) >= Hardcoded.DROPPOINT_SPAWN_HALITE)) {
 					if(game_state.game.me.halite >= Constants.DROPOFF_COST) {
 						game_state.dropoffs.add(ship.position);
 						return ship.makeDropoff();
 					}
+				}
+			}
+		}
+		
+		if(state == State.GATHERING) {
+			recent_gains.addLast(final_halite - ship.halite);
+			halite_gains_total += final_halite - ship.halite;
+			if(recent_gains.size() >= Hardcoded.BAD_GATHERING_STREAK_SIZE) {
+				int removing = recent_gains.pollFirst();
+				halite_gains_total -= removing;
+				if(halite_gains_total <= Hardcoded.BAD_GATHERING_STREAK_SIZE * Hardcoded.BAD_GATHERING_STREAK_AMOUNT_PER) {
+					state = State.FOCUSING;
+					focus_position = game_state.getHighestConcentration(final_pos);
+					Log.log("bad gathering; new focus on : " + focus_position);
 				}
 			}
 		}
