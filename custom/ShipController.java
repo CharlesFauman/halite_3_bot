@@ -112,13 +112,18 @@ public class ShipController {
 		halite_after = Math.min(halite_after, Constants.MAX_HALITE);
 		
 		double halite_next = 0;
+		int enemies_next_to = 0;
 		if(depth > 0 ) {
 			for(Direction new_direction : directions_order.keySet()) {
 				halite_next = Math.max(halite_next, scoreMove(new_pos, new_direction, game_state, halite_after, new HashMap<Position, Integer>(new_halites), depth-1));
+				Position next_pos = game_state.game.gameMap.normalize(new_pos.directionalOffset(new_direction));
+				if(game_state.game.gameMap.at(next_pos).ship != null) {
+					enemies_next_to += 1;
+				}
 			}
 		}
 
-		return halite_after + halite_next * Hardcoded.FUTURE_VALUE_MULTIPLIER;
+		return (halite_after + halite_next * Hardcoded.FUTURE_VALUE_MULTIPLIER) / (2*(1 + enemies_next_to));
 		
 	}
 
