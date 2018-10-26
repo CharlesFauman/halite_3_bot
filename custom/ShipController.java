@@ -117,7 +117,8 @@ public class ShipController {
 			for(Direction new_direction : directions_order.keySet()) {
 				halite_next = Math.max(halite_next, scoreMove(new_pos, new_direction, game_state, halite_after, new HashMap<Position, Integer>(new_halites), depth-1));
 				Position next_pos = game_state.game.gameMap.normalize(new_pos.directionalOffset(new_direction));
-				if(game_state.game.gameMap.at(next_pos).ship != null) {
+				Ship target_ship = game_state.game.gameMap.at(next_pos).ship;
+				if(target_ship != null && target_ship.owner != game_state.game.me.id) {
 					enemies_next_to += 1;
 				}
 			}
