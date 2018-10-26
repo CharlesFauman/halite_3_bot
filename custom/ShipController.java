@@ -65,6 +65,25 @@ public class ShipController {
 		
 		int limit = (int) (Hardcoded.LOW_HALITE_MULTIPLIER * Constants.MAX_HALITE);
 		
+		Position new_pos = game_state.game.gameMap.normalize(ship.position.directionalOffset(direction));
+		boolean inspired = false;
+		int near_enemies = 0;
+		if(Constants.INSPIRATION_ENABLED) {
+			int rad = Constants.INSPIRATION_RADIUS;
+			for(int x = 0; x < rad*2; ++ x) {
+				for(int y = 0; y < rad*2; ++y) {
+					if(x + y > rad) continue;
+					Ship target_ship = game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(new_pos.x + x - rad,new_pos.y + y - rad))).ship;
+					if(target_ship != null && target_ship.owner != game_state.game.me.id) {
+						near_enemies += 1;
+					}
+				}
+			}
+		}
+		if(near_enemies >= Constants.INSPIRATION_SHIP_COUNT) {
+			inspired = true;
+		}
+		
 		int halite_after = ship.halite;
 		if(direction.equals(Direction.STILL)) {
 			Integer halite_at_position = game_state.game.gameMap.at(pos).halite;
@@ -74,15 +93,23 @@ public class ShipController {
 			if(new_halites.containsKey(pos)) {
 				halite_at_position = new_halites.get(pos);
 			}
-			Integer change_at_position = halite_at_position / Constants.EXTRACT_RATIO;
-			halite_after += change_at_position;
+			Integer change_at_position;
+			if(inspired) {
+				change_at_position = halite_at_position / Constants.INSPIRED_EXTRACT_RATIO;
+				halite_after += change_at_position + change_at_position*Constants.INSPIRED_BONUS_MULTIPLIER;
+			}else {
+				change_at_position = halite_at_position / Constants.EXTRACT_RATIO;
+				halite_after += change_at_position;
+			}
 			new_halites.put(pos, halite_at_position - change_at_position);
 		}else {
-			halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.MOVE_COST_RATIO;
+			if(inspired) {
+				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.MOVE_COST_RATIO;
+			}else {
+				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.INSPIRED_MOVE_COST_RATIO;
+			}
 		}
 		halite_after = Math.min(halite_after, Constants.MAX_HALITE);
-		
-		Position new_pos = game_state.game.gameMap.normalize(ship.position.directionalOffset(direction));
 		
 		double halite_next = 0;
 		if(depth > 0 ) {
@@ -185,7 +212,7 @@ public class ShipController {
 			}
 		}
 		
-		if(final_halite >= 0.9 * Constants.MAX_HALITE) {
+		if(final_halite >= 0.96 * Constants.MAX_HALITE) {
 			Log.log("Returning with " + final_halite);
 			state = State.RETURNING;
 		}
@@ -222,9 +249,10 @@ public class ShipController {
 					}
 				}
 				
-				if(total_near >= Hardcoded.DROPPOINT_SPAWN_TARGET || (total_near >= 1 && (near_halite / (rad*rad)) >= Hardcoded.DROPPOINT_SPAWN_HALITE)) {
-					if(game_state.game.me.halite >= Constants.DROPOFF_COST) {
+				if(total_near >= Hardcoded.DROPPOINT_SPAWN_TARGET || (total_near >= 2 && (near_halite / (rad*rad)) >= Hardcoded.DROPPOINT_SPAWN_HALITE)) {
+					if(game_state.turn_halite >= Constants.DROPOFF_COST) {
 						game_state.dropoffs.add(ship.position);
+						game_state.turn_halite -= Constants.DROPOFF_COST;
 						return ship.makeDropoff();
 					}
 				}

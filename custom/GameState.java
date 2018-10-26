@@ -26,6 +26,7 @@ public class GameState {
 	HashMap<EntityId, ShipController> ship_controllers;
 	HashSet<Position> ship_positions;
 	HashSet<Position> dropoffs;
+	int turn_halite;
 	
 	public GameState(){
 	    game = new Game();
@@ -87,6 +88,8 @@ public class GameState {
 	public void update() {
         game.updateFrame();
         
+        turn_halite = game.me.halite;
+        
         if(game.turnNumber != 0 && game.turnNumber % Hardcoded.SEARCH_DIST_MOD == 0) {
         	search_dist += Hardcoded.SEARCH_DIST_INCREMENT;
         }
@@ -144,10 +147,10 @@ public class GameState {
 		}
 
         if (
-        	(total_halite / (total_ships+1)) >= (1.5*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 100) / 100)) &&
+        	(total_halite / (total_ships+1))/(game.gameMap.width*game.gameMap.height * 1.0 / 1024.0) >= (1.5*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 100) / 100)) &&
             game.turnNumber <= Constants.MAX_TURNS * Hardcoded.LAST_SPAWN_TURN_MULTIPLIER &&
             ship_controllers.size() <= (Constants.MAX_TURNS - Hardcoded.MAX_BOT_NUMBER_SUBTRACTOR) * Hardcoded.MAX_BOT_NUMBER_MULTIPLIER &&
-            game.me.halite >= Constants.SHIP_COST  + buffer &&
+            turn_halite >= Constants.SHIP_COST  + buffer &&
             !ship_positions.contains(game.me.shipyard.position)
             )
         {
