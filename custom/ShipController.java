@@ -127,6 +127,32 @@ public class ShipController {
 		return (halite_after + halite_next * Hardcoded.FUTURE_VALUE_MULTIPLIER) / (2*(1 + enemies_next_to));
 		
 	}
+	
+	public boolean maybe_dropoff(GameState game_state, Position final_pos) {
+		int distance = game_state.game.gameMap.calculateDistance(final_pos, game_state.getClosestDropoff(final_pos));
+		if(distance >= Hardcoded.MIN_DROPPOINT_DISTANCE) {
+			
+			double near_halite = 0;
+			int rad = Hardcoded.DROPPOINT_SPAWN_RADIUS;
+			for(int x = -rad; x <= rad; ++ x) {
+				for(int y = -rad; y <= rad; ++y) {
+					if(Math.abs(x) + Math.abs(y) > rad) continue;
+					near_halite += game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x,final_pos.y + y))).halite;
+				}
+			}
+			
+			near_halite /= (rad*rad + (rad-1)*(rad-1));
+			
+			if(near_halite >= Hardcoded.DROPPOINT_SPAWN_HALITE) {
+				if(game_state.turn_halite >= Constants.DROPOFF_COST) {
+					game_state.dropoffs.add(ship.position);
+					game_state.turn_halite -= Constants.DROPOFF_COST;
+					return true;
+				}
+			}
+		}
+		return false;
+	}
 
 	public Command getCommand(GameState game_state) {
 		Log.log("id: " + ship.id + ", position: " + ship.position.toString() + ", halite: " + ship.halite + ", state: " + state);
@@ -220,6 +246,9 @@ public class ShipController {
 		
 		if(final_halite >= 0.96 * Constants.MAX_HALITE) {
 			Log.log("Returning with " + final_halite);
+			if(maybe_dropoff(game_state, final_pos)) {
+				return ship.makeDropoff();
+			}
 			state = State.RETURNING;
 		}
 		
@@ -237,32 +266,11 @@ public class ShipController {
 		if(state == State.FOCUSING && final_pos.equals(focus_position)){
 			focus_position = null;
 			state = State.GATHERING;
-			int distance = game_state.game.gameMap.calculateDistance(final_pos, game_state.getClosestDropoff(final_pos));
-			if(distance >= Hardcoded.MIN_DROPPOINT_DISTANCE) {
-				int total_near = 0;
-				for(ShipController ship_control : game_state.ship_controllers.values()) {
-					int s_dist = game_state.game.gameMap.calculateDistance(final_pos, ship_control.ship.position);
-					if(s_dist  <= Hardcoded.DROPPOINT_SPAWN_RADIUS) {
-						total_near += 1;
-					}
-				}
-				
-				int near_halite = 0;
-				int rad = Hardcoded.DROPPOINT_SPAWN_RADIUS;
-				for(int x = 0; x < rad; ++ x) {
-					for(int y = 0; y < rad; ++y) {
-						near_halite += game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x - rad/2,final_pos.y + y - rad/2))).halite;
-					}
-				}
-				
-				if(total_near >= Hardcoded.DROPPOINT_SPAWN_TARGET || (total_near >= 2 && (near_halite / (rad*rad)) >= Hardcoded.DROPPOINT_SPAWN_HALITE)) {
-					if(game_state.turn_halite >= Constants.DROPOFF_COST) {
-						game_state.dropoffs.add(ship.position);
-						game_state.turn_halite -= Constants.DROPOFF_COST;
-						return ship.makeDropoff();
-					}
-				}
+			
+			if(maybe_dropoff(game_state, final_pos)) {
+				return ship.makeDropoff();
 			}
+			
 		}
 		
 		if(state == State.GATHERING) {

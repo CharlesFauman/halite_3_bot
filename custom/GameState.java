@@ -22,7 +22,6 @@ public class GameState {
 	
 	Random rng;
 	Game game;
-	Integer search_dist;
 	HashMap<EntityId, ShipController> ship_controllers;
 	HashSet<Position> ship_positions;
 	HashSet<Position> dropoffs;
@@ -35,7 +34,6 @@ public class GameState {
         
         long rngSeed = System.nanoTime();
         rng = new Random(rngSeed);
-        search_dist = Hardcoded.START_SEARCH_DIST;
         
         ship_controllers = new HashMap<>();
         ship_positions = new HashSet<>();
@@ -66,22 +64,32 @@ public class GameState {
 			for(int j = 0; j < game_map.height; ++j){
 				Position pos = new Position(i, j);
 				int temp_distance = game_map.calculateDistance(from, game_map.normalize(new Position(pos.x + Hardcoded.FOCUS_SIZE/2, pos.y + Hardcoded.FOCUS_SIZE/2)));
-				if(pos.equals(from) || search_dist < temp_distance) {
+				if(pos.equals(from)) {
 					continue;
 				}
-				int temp = 0;
-				for(int x = 0; x < Hardcoded.FOCUS_SIZE; ++ x) {
-					for(int y = 0; y < Hardcoded.FOCUS_SIZE; ++y) {
-						temp += game_map.at(game_map.normalize(new Position(x + i,y + j))).halite;
+				double temp = 0;
+				int max_rad = Hardcoded.FOCUS_SIZE;
+				for(int x = -Hardcoded.FOCUS_SIZE; x < Hardcoded.FOCUS_SIZE; ++ x) {
+					for(int y = -Hardcoded.FOCUS_SIZE; y < Hardcoded.FOCUS_SIZE; ++y) {
+						int rad = Math.abs(x) + Math.abs(y);
+						if(rad > Hardcoded.FOCUS_SIZE) continue;
+						Position current_pos = new Position(x + i,y + j);
+						double val = game_map.at(game_map.normalize(current_pos)).halite;
+						val *= Math.pow(Hardcoded.DISTANCE_DISCOUNT, rad);
+						temp += val;
 					}
 				}
-				temp /= (temp_distance+1)*Hardcoded.DISTANCE_DISCOUNT_MULTIPLIER;
+				int distance_to_dropoff = game.gameMap.calculateDistance(pos, getClosestDropoff(pos));
+				temp /= (max_rad*max_rad + (max_rad-1)*(max_rad-1));
+				temp *= Math.pow(Hardcoded.DROPOFF_DISTANCE_DISCOUNT, (distance_to_dropoff + 1));
+				temp *= Math.pow(Hardcoded.DISTANCE_DISCOUNT, (temp_distance+1));
 				if(temp > value) {
 					value = temp;
 					highest_concentration = game_map.normalize(new Position(pos.x + Hardcoded.FOCUS_SIZE/2, pos.y + Hardcoded.FOCUS_SIZE/2));
 				}
 			}
 		}
+		Log.log("found value: " + value);
 		return highest_concentration;
 	}
 	
@@ -90,10 +98,6 @@ public class GameState {
         
         turn_halite = game.me.halite;
         
-        if(game.turnNumber != 0 && game.turnNumber % Hardcoded.SEARCH_DIST_MOD == 0) {
-        	search_dist += Hardcoded.SEARCH_DIST_INCREMENT;
-        }
-
         HashMap<EntityId, ShipController> new_ship_controllers = new HashMap<>();
         for(Ship ship : game.me.ships.values()) {
         	if(ship_controllers.containsKey(ship.id)) {
