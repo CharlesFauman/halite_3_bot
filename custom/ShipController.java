@@ -70,10 +70,10 @@ public class ShipController {
 		int near_enemies = 0;
 		if(Constants.INSPIRATION_ENABLED) {
 			int rad = Constants.INSPIRATION_RADIUS;
-			for(int x = 0; x < rad*2; ++ x) {
-				for(int y = 0; y < rad*2; ++y) {
-					if(x + y > rad) continue;
-					Ship target_ship = game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(new_pos.x + x - rad,new_pos.y + y - rad))).ship;
+			for(int x = -rad; x <= rad; ++ x) {
+				for(int y = -rad; y <= rad; ++y) {
+					if(Math.abs(x) + Math.abs(y) > rad) continue;
+					Ship target_ship = game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(new_pos.x + x,new_pos.y + y))).ship;
 					if(target_ship != null && target_ship.owner != game_state.game.me.id) {
 						near_enemies += 1;
 					}
@@ -137,7 +137,8 @@ public class ShipController {
 			for(int x = -rad; x <= rad; ++ x) {
 				for(int y = -rad; y <= rad; ++y) {
 					if(Math.abs(x) + Math.abs(y) > rad) continue;
-					near_halite += game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x,final_pos.y + y))).halite;
+					int pos_halite = game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x,final_pos.y + y))).halite;
+					near_halite += Math.max(pos_halite-Constants.MAX_HALITE*Hardcoded.LOW_HALITE_MULTIPLIER, 0);
 				}
 			}
 			
@@ -275,8 +276,8 @@ public class ShipController {
 		
 		if(state == State.GATHERING) {
 			recent_gains.addLast(final_halite - ship.halite);
-			halite_gains_total += final_halite - ship.halite;
-			if(recent_gains.size() >= Hardcoded.BAD_GATHERING_STREAK_SIZE) {
+			halite_gains_total += Math.max(final_halite - ship.halite, 0);
+			if(recent_gains.size() > Hardcoded.BAD_GATHERING_STREAK_SIZE) {
 				int removing = recent_gains.pollFirst();
 				halite_gains_total -= removing;
 				if(halite_gains_total <= Hardcoded.BAD_GATHERING_STREAK_SIZE * Hardcoded.BAD_GATHERING_STREAK_AMOUNT_PER) {
