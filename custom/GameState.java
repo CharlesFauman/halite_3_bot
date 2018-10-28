@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Random;
 
 import custom.ShipController.State;
@@ -28,6 +30,7 @@ public class GameState {
 	HashSet<Position> ship_positions;
 	HashMap<Position, Integer> focus_positions;
 	HashSet<Position> dropoffs;
+    LinkedList<MutableInteger> dropoff_nums;
 	int turn_halite;
 	double min_halite;
 	boolean spawned;
@@ -47,6 +50,7 @@ public class GameState {
         dropoffs = new HashSet<>();
         focus_positions = new HashMap<>();
         dropoffs.add(game.me.shipyard.position);
+        dropoff_nums = new LinkedList<>();
         
 	    game.ready("MyJavaBot");
 	}
@@ -121,6 +125,14 @@ public class GameState {
         game.updateFrame();
         
         turn_halite = game.me.halite;
+        
+        for(Iterator<MutableInteger> itr = dropoff_nums.iterator(); itr.hasNext();) {
+        	MutableInteger next = itr.next();
+        	next.val += 1;
+        	if(next.val >= 60) {
+        		itr.remove();
+        	}
+        }
         
         focus_positions.clear();
         

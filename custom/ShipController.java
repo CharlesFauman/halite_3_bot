@@ -136,7 +136,7 @@ public class ShipController {
 	}
 	
 	public boolean check_dropoff(GameState game_state, Position final_pos) {
-		
+		if(game_state.dropoff_nums.size() >= 2) return false;
 		int distance = game_state.game.gameMap.calculateDistance(final_pos, game_state.getClosestDropoff(final_pos));
 		if(distance >= Hardcoded.MIN_DROPPOINT_DISTANCE) {
 			
@@ -155,6 +155,7 @@ public class ShipController {
 			if(near_halite >= Hardcoded.DROPPOINT_SPAWN_HALITE) {
 				if(game_state.turn_halite >= Constants.DROPOFF_COST) {
 					game_state.dropoffs.add(ship.position);
+					game_state.dropoff_nums.add(new MutableInteger(0));
 					game_state.turn_halite -= Constants.DROPOFF_COST;
 					return true;
 				}
@@ -164,6 +165,7 @@ public class ShipController {
 	}
 	
 	public Position maybe_dropoff(GameState game_state, Position pos) {
+		if(game_state.dropoff_nums.size() >= 2) return null;
 		double best_score = 0;
 		Position best_placement = null;
 		int max_rad = 6;
