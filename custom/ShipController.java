@@ -63,7 +63,7 @@ public class ShipController {
 	
 	public double scoreMove(Position pos, Direction direction, GameState game_state, Integer halite, HashMap<Position, Integer> new_halites, Integer depth) {
 		
-		int limit = (int) (Hardcoded.LOW_HALITE_MULTIPLIER * Constants.MAX_HALITE);
+		int limit = (int) (game_state.min_halite);
 		
 		Position new_pos = game_state.game.gameMap.normalize(ship.position.directionalOffset(direction));
 		boolean inspired = false;
@@ -104,9 +104,9 @@ public class ShipController {
 			new_halites.put(pos, halite_at_position - change_at_position);
 		}else {
 			if(inspired) {
-				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.MOVE_COST_RATIO;
-			}else {
 				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.INSPIRED_MOVE_COST_RATIO;
+			}else {
+				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.MOVE_COST_RATIO;
 			}
 		}
 		halite_after = Math.min(halite_after, Constants.MAX_HALITE);
@@ -138,7 +138,7 @@ public class ShipController {
 				for(int y = -rad; y <= rad; ++y) {
 					if(Math.abs(x) + Math.abs(y) > rad) continue;
 					int pos_halite = game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x,final_pos.y + y))).halite;
-					near_halite += Math.max(pos_halite-Constants.MAX_HALITE*Hardcoded.LOW_HALITE_MULTIPLIER, 0);
+					near_halite += Math.max(pos_halite-game_state.min_halite, 0);
 				}
 			}
 			
@@ -184,7 +184,8 @@ public class ShipController {
 					score = -1*distance;
 					break;
 				case FOCUSING:
-					score = -1*game_state.game.gameMap.calculateDistance(new_pos, focus_position);
+					score = scoreMove(new_pos, direction, game_state, ship.halite, new HashMap<Position, Integer>(), Hardcoded.LOOKAHEAD);
+					score -= 200*game_state.game.gameMap.calculateDistance(new_pos, focus_position);
 					break;
 				case GATHERING:
 					score = scoreMove(new_pos, direction, game_state, ship.halite, new HashMap<Position, Integer>(), Hardcoded.LOOKAHEAD);

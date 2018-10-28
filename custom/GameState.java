@@ -27,6 +27,7 @@ public class GameState {
 	HashSet<Position> ship_positions;
 	HashSet<Position> dropoffs;
 	int turn_halite;
+	double min_halite;
 	
 	public GameState(){
 	    game = new Game();
@@ -69,7 +70,8 @@ public class GameState {
 					continue;
 				}
 				double temp = 0;
-				int num_ships = 0;
+				int num_ships_me = 0;
+				int num_ships_them = 0;
 				int max_rad = Hardcoded.FOCUS_SIZE;
 				for(int x = -Hardcoded.FOCUS_SIZE; x < Hardcoded.FOCUS_SIZE; ++ x) {
 					for(int y = -Hardcoded.FOCUS_SIZE; y < Hardcoded.FOCUS_SIZE; ++y) {
@@ -79,10 +81,14 @@ public class GameState {
 						MapCell game_at = game_map.at(game_map.normalize(current_pos));
 						double val;
 						if(game_at.ship != null) {
-							num_ships += 1;
+							if(game_at.ship.owner == game.me.id) {
+								num_ships_me += 1;
+							}else{
+								num_ships_them += 1;
+							}
 							val = 0;
 						}else {
-							 val = Math.max(game_map.at(game_map.normalize(current_pos)).halite-(Constants.MAX_HALITE*Hardcoded.LOW_HALITE_MULTIPLIER), 0);
+							 val = Math.max(game_map.at(game_map.normalize(current_pos)).halite-(min_halite), 0);
 							 val *= Math.pow(Hardcoded.DISTANCE_DISCOUNT, rad);
 						}
 						temp += val;
@@ -90,7 +96,8 @@ public class GameState {
 				}
 				int distance_to_dropoff = game.gameMap.calculateDistance(pos, getClosestDropoff(pos));
 				
-				temp -= num_ships*Math.max(temp_distance*30, 300);
+				temp -= num_ships_me*Math.max(temp_distance, 15)*10;
+				temp -= num_ships_them*Math.max(temp_distance, 15)*15;
 				temp /= (max_rad*max_rad + (max_rad-1)*(max_rad-1));
 				temp *= Math.pow(Hardcoded.DROPOFF_DISTANCE_DISCOUNT, (distance_to_dropoff + 1));
 				temp *= Math.pow(Hardcoded.DISTANCE_DISCOUNT, (temp_distance+1));
@@ -127,6 +134,15 @@ public class GameState {
 	private void submitCommands() {
         final ArrayList<Command> command_queue = new ArrayList<>();
         
+       	double total_halite = 0;
+		for(int i = 0; i < game.gameMap.width; ++i){
+			for(int j = 0; j < game.gameMap.height; ++j){
+				total_halite += game.gameMap.at(new Position(i, j)).halite;
+			}
+		}
+		
+		min_halite = total_halite / (game.gameMap.width*game.gameMap.height*Hardcoded.MIN_HALITE_MULTIPLY);
+        
         ArrayList<ShipController> ships_controls = new ArrayList<ShipController>(ship_controllers.values());
 
         Collections.sort(ships_controls, new Comparator<ShipController>(){
@@ -153,16 +169,9 @@ public class GameState {
        	for(Player player : game.players) {
        		total_ships += player.ships.size();
        	}
-       	
-       	int total_halite = 0;
-		for(int i = 0; i < game.gameMap.width; ++i){
-			for(int j = 0; j < game.gameMap.height; ++j){
-				total_halite += Math.max(game.gameMap.at(new Position(i, j)).halite-(Constants.MAX_HALITE*Hardcoded.LOW_HALITE_MULTIPLIER), 0);
-			}
-		}
 
         if (
-        	(total_halite / (total_ships+1))/(game.gameMap.width*game.gameMap.height * 1.0 / 1024.0) >= (1.2*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 100) / 100)) &&
+        	(total_halite / (total_ships+1))/(game.gameMap.width*game.gameMap.height * 1.0 / 1024.0) >= (1.8*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 100) / 100)) &&
             game.turnNumber <= Constants.MAX_TURNS * Hardcoded.LAST_SPAWN_TURN_MULTIPLIER &&
             ship_controllers.size() <= (Constants.MAX_TURNS - Hardcoded.MAX_BOT_NUMBER_SUBTRACTOR) * Hardcoded.MAX_BOT_NUMBER_MULTIPLIER &&
             turn_halite >= Constants.SHIP_COST  + buffer &&
