@@ -24,7 +24,7 @@ public class ShipController {
 	
 	enum State 
 	{ 
-	    STUCK(0), FOCUSING(1), RETURNING(2), GATHERING(3); 
+	    STUCK(0), FOCUSING(3), RETURNING(1), GATHERING(2); 
 		
 	    private final int value;
 	    private State(int value) {
@@ -49,6 +49,10 @@ public class ShipController {
 	
 	public void update(Ship ship) {
 		this.ship = ship;
+	}
+	
+	public void destroy() {
+		//
 	}
 	
 	public ShipController(Ship ship){
@@ -116,19 +120,23 @@ public class ShipController {
 		if(depth > 0 ) {
 			for(Direction new_direction : directions_order.keySet()) {
 				halite_next = Math.max(halite_next, scoreMove(new_pos, new_direction, game_state, halite_after, new HashMap<Position, Integer>(new_halites), depth-1));
-				Position next_pos = game_state.game.gameMap.normalize(new_pos.directionalOffset(new_direction));
-				Ship target_ship = game_state.game.gameMap.at(next_pos).ship;
-				if(target_ship != null && target_ship.owner != game_state.game.me.id) {
-					enemies_next_to += 1;
-				}
+			}
+		}
+		
+		for(Direction new_direction : directions_order.keySet()) {
+			Position next_pos = game_state.game.gameMap.normalize(new_pos.directionalOffset(new_direction));
+			Ship target_ship = game_state.game.gameMap.at(next_pos).ship;
+			if(target_ship != null && target_ship.owner != game_state.game.me.id) {
+				enemies_next_to += 1;
 			}
 		}
 
-		return (halite_after + halite_next * Hardcoded.FUTURE_VALUE_MULTIPLIER) / (2*(1 + enemies_next_to));
+		return halite_after + halite_next * Hardcoded.FUTURE_VALUE_MULTIPLIER;
 		
 	}
 	
-	public boolean maybe_dropoff(GameState game_state, Position final_pos) {
+	public boolean check_dropoff(GameState game_state, Position final_pos) {
+		
 		int distance = game_state.game.gameMap.calculateDistance(final_pos, game_state.getClosestDropoff(final_pos));
 		if(distance >= Hardcoded.MIN_DROPPOINT_DISTANCE) {
 			
@@ -153,6 +161,45 @@ public class ShipController {
 			}
 		}
 		return false;
+	}
+	
+	public Position maybe_dropoff(GameState game_state, Position pos) {
+		double best_score = 0;
+		Position best_placement = null;
+		int max_rad = 6;
+		for(int x1 = -max_rad; x1 < max_rad; ++ x1) {
+			for(int y1 = -max_rad; y1 < max_rad; ++y1) {
+				int outer_rad = Math.abs(x1) + Math.abs(y1);
+				if(outer_rad > max_rad) continue;
+				Position final_pos = new Position(pos.x + x1, pos.y + y1);
+				int distance = game_state.game.gameMap.calculateDistance(final_pos, game_state.getClosestDropoff(final_pos));
+				if(distance >= Hardcoded.MIN_DROPPOINT_DISTANCE) {
+					
+					double near_halite = 0;
+					int rad = Hardcoded.DROPPOINT_SPAWN_RADIUS;
+					for(int x = -rad; x <= rad; ++ x) {
+						for(int y = -rad; y <= rad; ++y) {
+							if(Math.abs(x) + Math.abs(y) > rad) continue;
+							int pos_halite = game_state.game.gameMap.at(game_state.game.gameMap.normalize(new Position(final_pos.x + x,final_pos.y + y))).halite;
+							near_halite += Math.max(pos_halite-game_state.min_halite, 0);
+						}
+					}
+					
+					near_halite /= (rad*rad + (rad-1)*(rad-1));
+					
+					if(near_halite < best_score) continue;
+					
+					if(near_halite >= Hardcoded.DROPPOINT_SPAWN_HALITE) {
+						if(game_state.turn_halite >= Constants.DROPOFF_COST) {
+							best_score = near_halite;
+							best_placement = final_pos;
+						}
+					}
+				}
+				//
+			}
+		}
+		return best_placement;
 	}
 
 	public Command getCommand(GameState game_state) {
@@ -246,12 +293,15 @@ public class ShipController {
 			}
 		}
 		
-		if(final_halite >= 0.96 * Constants.MAX_HALITE) {
+		if(final_halite >= 0.96 * Constants.MAX_HALITE && state == State.GATHERING) {
 			Log.log("Returning with " + final_halite);
-			if(maybe_dropoff(game_state, final_pos)) {
-				return ship.makeDropoff();
+			Position target = maybe_dropoff(game_state, final_pos);
+			if(target != null) {
+				state = State.FOCUSING;
+				focus_position = target;
+			}else {
+				state = State.RETURNING;
 			}
-			state = State.RETURNING;
 		}
 		
 		if(final_halite < position_halite / Constants.MOVE_COST_RATIO) {
@@ -269,7 +319,7 @@ public class ShipController {
 			focus_position = null;
 			state = State.GATHERING;
 			
-			if(maybe_dropoff(game_state, final_pos)) {
+			if(check_dropoff(game_state, final_pos)) {
 				return ship.makeDropoff();
 			}
 			
