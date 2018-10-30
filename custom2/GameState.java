@@ -52,7 +52,7 @@ public class GameState {
         dropoffs.add(game.me.shipyard.position);
         dropoff_nums = new LinkedList<>();
         
-	    game.ready("MyJavaBot");
+	    game.ready("CurrentDeploymentBot");
 	}
 	
 	public Position getClosestDropoff(Position position) {
