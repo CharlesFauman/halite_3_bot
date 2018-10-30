@@ -3,13 +3,17 @@ package custom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 
 import hlt.Command;
 import hlt.Constants;
 import hlt.Direction;
+import hlt.Entity;
+import hlt.GameMap;
 import hlt.Log;
+import hlt.MapCell;
 import hlt.Position;
 import hlt.Ship;
 
@@ -55,17 +59,18 @@ public class ShipController {
 		//
 	}
 	
-	public ShipController(Ship ship){
+	public ShipController(Ship ship, GameState game_state){
 		Log.log("new ship with id: " + ship.id);
 		update(ship);
-		state = State.GATHERING;
+		focus_position = game_state.getHighestConcentration(ship.position);
+		state = State.FOCUSING;
 		halite_gains_total = 0;
 		recent_gains = new LinkedList<>();
 		
 		setDirectionsOrder();
 	}
 	
-	public double scoreMove(Position pos, Direction direction, GameState game_state, Integer halite, HashMap<Position, Integer> new_halites, Integer depth) {
+	public double scoreMove(Position pos, Direction direction, GameState game_state, Integer halite) {
 		
 		int limit = (int) (game_state.min_halite);
 		
@@ -89,13 +94,11 @@ public class ShipController {
 		}
 		
 		int halite_after = ship.halite;
+		int halite_next = game_state.game.gameMap.at(new_pos).halite;
 		if(direction.equals(Direction.STILL)) {
 			Integer halite_at_position = game_state.game.gameMap.at(pos).halite;
 			if(halite_at_position <= limit) {
-				return 0;
-			}
-			if(new_halites.containsKey(pos)) {
-				halite_at_position = new_halites.get(pos);
+				halite_at_position = 0;
 			}
 			Integer change_at_position;
 			if(inspired) {
@@ -105,7 +108,7 @@ public class ShipController {
 				change_at_position = halite_at_position / Constants.EXTRACT_RATIO;
 				halite_after += change_at_position;
 			}
-			new_halites.put(pos, halite_at_position - change_at_position);
+			halite_next -= change_at_position;
 		}else {
 			if(inspired) {
 				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.INSPIRED_MOVE_COST_RATIO;
@@ -113,30 +116,87 @@ public class ShipController {
 				halite_after -= game_state.game.gameMap.at(ship.position).halite / Constants.MOVE_COST_RATIO;
 			}
 		}
+		halite_after = Math.max(halite_after, 0);
 		halite_after = Math.min(halite_after, Constants.MAX_HALITE);
 		
-		double halite_next = 0;
-		int enemies_next_to = 0;
-		if(depth > 0 ) {
-			for(Direction new_direction : directions_order.keySet()) {
-				halite_next = Math.max(halite_next, scoreMove(new_pos, new_direction, game_state, halite_after, new HashMap<Position, Integer>(new_halites), depth-1));
+		Log.log("HALITE_AFTER:" + halite_after);
+		
+		int rad = 6;
+		if(direction == Direction.STILL) {
+			if(game_state.game.gameMap.at(pos).halite >= limit) {
+				return halite_after + 2*limit;
+			}
+			return halite_after;
+		}
+		
+		
+		Position current = new_pos;
+		Direction right = direction.turnRight();
+		Direction left = right.invertDirection();
+		int num_ships_me = 0;
+		int num_ships_them = 0;
+		LinkedList<Integer> num_dropoffs_them = new LinkedList<Integer>();
+		double worth = 0;
+		GameMap game_map = game_state.game.gameMap;
+		for(int dir = 0; dir <= rad; ++dir) {
+			Position current_pos = current.directionalOffset(right, (rad - dir));
+			for(int side = -(rad-dir); side <= (rad-dir); ++side) {
+				int dist = dir + Math.abs(side);
+				
+				if(game_map.at(current_pos).structure != null && game_map.at(current_pos).structure.owner != game_state.game.me.id) {
+					num_dropoffs_them.add(dist);
+				}
+				MapCell game_at = game_map.at(game_map.normalize(current_pos));
+				double val;
+				if(game_at.ship != null) {
+					if(game_at.ship.owner == game_state.game.me.id) {
+						num_ships_me += 1;
+					}else{
+						num_ships_them += 1;
+					}
+					val = 0;
+				}else {
+					 val = Math.max(game_map.at(game_map.normalize(current_pos)).halite-(game_state.min_halite), 0);
+					 val *= Math.pow(0.8, dist);
+				}
+				worth += val;
+				
+				current_pos = current_pos.directionalOffset(left);
+			}
+			current = current.directionalOffset(direction);
+		}
+		
+		if(num_ships_me < num_ships_them) {
+			worth *= Math.pow(.9, (num_ships_them - num_ships_me));
+		}else {
+			worth *= Math.pow(1.04, num_ships_them);
+		}
+		
+		
+		Ship other_ship = game_state.game.gameMap.at(new_pos).ship;
+		
+		if(other_ship != null && other_ship.owner != game_state.game.me.id) {
+			Entity structure = game_state.game.gameMap.at(new_pos).structure;
+			if(structure == null || structure.owner == game_state.game.me.id) {
+				double halite_diff = ship.halite - 2*other_ship.halite;
+				if(num_ships_me > num_ships_them) {
+					worth += halite_diff/20;
+				}else {
+					worth -= ship.halite/20;
+				}
 			}
 		}
 		
-		for(Direction new_direction : directions_order.keySet()) {
-			Position next_pos = game_state.game.gameMap.normalize(new_pos.directionalOffset(new_direction));
-			Ship target_ship = game_state.game.gameMap.at(next_pos).ship;
-			if(target_ship != null && target_ship.owner != game_state.game.me.id) {
-				enemies_next_to += 1;
-			}
-		}
+		worth = worth / (30*(rad^2));
+		
+		Log.log("WORTH: " + worth);
 
-		return halite_after + halite_next * Hardcoded.FUTURE_VALUE_MULTIPLIER;
+		return halite_after + worth;
 		
 	}
 	
 	public boolean check_dropoff(GameState game_state, Position final_pos) {
-		if(game_state.dropoff_nums.size() >= 2) return false;
+		if(game_state.game.gameMap.at(final_pos).hasStructure() || game_state.dropoff_nums.size() >= 2) return false;
 		int distance = game_state.game.gameMap.calculateDistance(final_pos, game_state.getClosestDropoff(final_pos));
 		if(distance >= Hardcoded.MIN_DROPPOINT_DISTANCE) {
 			
@@ -154,9 +214,6 @@ public class ShipController {
 			
 			if(near_halite >= Hardcoded.DROPPOINT_SPAWN_HALITE) {
 				if(game_state.turn_halite >= Constants.DROPOFF_COST) {
-					game_state.dropoffs.add(ship.position);
-					game_state.dropoff_nums.add(new MutableInteger(0));
-					game_state.turn_halite -= Constants.DROPOFF_COST;
 					return true;
 				}
 			}
@@ -165,7 +222,7 @@ public class ShipController {
 	}
 	
 	public Position maybe_dropoff(GameState game_state, Position pos) {
-		if(game_state.dropoff_nums.size() >= 2) return null;
+		if(game_state.game.gameMap.at(pos).hasStructure()|| game_state.dropoff_nums.size() >= 2) return null;
 		double best_score = 0;
 		Position best_placement = null;
 		int max_rad = 6;
@@ -231,19 +288,24 @@ public class ShipController {
 				switch(state) {
 				case RETURNING:
 					score = -1*distance;
+					if(direction == Direction.STILL) {
+						score -= 2;
+					}
 					break;
 				case FOCUSING:
-					score = scoreMove(new_pos, direction, game_state, ship.halite, new HashMap<Position, Integer>(), Hardcoded.LOOKAHEAD);
-					score -= 200*game_state.game.gameMap.calculateDistance(new_pos, focus_position);
+					score = -200*game_state.game.gameMap.calculateDistance(new_pos, focus_position);
+					if(ship.halite < Constants.MAX_HALITE*.8) {
+						score += scoreMove(new_pos, direction, game_state, ship.halite);
+					}
 					break;
 				case GATHERING:
-					score = scoreMove(new_pos, direction, game_state, ship.halite, new HashMap<Position, Integer>(), Hardcoded.LOOKAHEAD);
+					score = scoreMove(new_pos, direction, game_state, ship.halite);
 					break;
 				default:
 					break;
 				}
 				
-				if(game_state.game.gameMap.at(new_pos).ship != null) {
+				if(game_state.game.gameMap.at(new_pos).ship != null && state != State.GATHERING && state != State.FOCUSING ) {
 					if(!game_state.game.gameMap.at(new_pos).ship.owner.equals(game_state.game.me.id) && distance > Hardcoded.ENEMY_NO_COLLIDE_DISTANCE) {
 						continue;
 					}
@@ -295,33 +357,27 @@ public class ShipController {
 			}
 		}
 		
-		if(final_halite >= 0.96 * Constants.MAX_HALITE && state == State.GATHERING) {
-			Log.log("Returning with " + final_halite);
-			Position target = maybe_dropoff(game_state, final_pos);
-			if(target != null) {
-				state = State.FOCUSING;
-				focus_position = target;
-			}else {
-				state = State.RETURNING;
-			}
-		}
-		
 		if(final_halite < position_halite / Constants.MOVE_COST_RATIO) {
 			Log.log("Stucking, " + final_halite + ", pos_h:" + position_halite);
 			state = State.STUCK;
 		}
 		
 		if(state == State.RETURNING && game_state.dropoffs.contains(final_pos)) {
+			
 			state = State.FOCUSING;
 			focus_position = game_state.getHighestConcentration(final_pos);
 			Log.log("focusing on : " + focus_position);
+			
+			state = State.GATHERING;
 		}
 		
-		if(state == State.FOCUSING && final_pos.equals(focus_position)){
+		if(state == State.FOCUSING && (final_pos.equals(focus_position) || final_halite >= (double)Constants.MAX_HALITE/8)){
 			focus_position = null;
 			state = State.GATHERING;
-			
-			if(check_dropoff(game_state, final_pos)) {
+			if(!game_state.game.gameMap.at(ship.position).hasStructure() && check_dropoff(game_state, final_pos)) {
+				game_state.dropoffs.add(ship.position);
+				game_state.dropoff_nums.add(new MutableInteger(0));
+				game_state.turn_halite -= Constants.DROPOFF_COST;
 				return ship.makeDropoff();
 			}
 			
@@ -338,6 +394,18 @@ public class ShipController {
 					focus_position = game_state.getHighestConcentration(final_pos);
 					Log.log("bad gathering; new focus on : " + focus_position);
 				}
+			}
+		}
+		
+		if(final_halite >= 900) {
+			Log.log("Returning with " + final_halite);
+			Position target = maybe_dropoff(game_state, final_pos);
+			if(target != null) {
+				state = State.FOCUSING;
+				focus_position = target;
+				Log.log("Actually, dropping with " + target);
+			}else {
+				state = State.RETURNING;
 			}
 		}
 		

@@ -20,8 +20,12 @@ public class Position {
         
         return suroundingCardinals;
     }
-
+    
     public Position directionalOffset(final Direction d) {
+    	return directionalOffset(d, 1);
+    }
+
+    public Position directionalOffset(final Direction d, int amount) {
         final int dx;
         final int dy;
 
@@ -50,7 +54,7 @@ public class Position {
                 throw new IllegalStateException("Unknown direction " + d);
         }
 
-        return new Position(x + dx, y + dy);
+        return new Position(x + amount*dx, y + amount*dy);
     }
 
     @Override

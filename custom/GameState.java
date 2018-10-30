@@ -82,12 +82,16 @@ public class GameState {
 				double temp = 0;
 				int num_ships_me = 0;
 				int num_ships_them = 0;
+				LinkedList<Integer> num_dropoffs_them = new LinkedList<Integer>();
 				int max_rad = Hardcoded.FOCUS_SIZE;
 				for(int x = -Hardcoded.FOCUS_SIZE; x < Hardcoded.FOCUS_SIZE; ++ x) {
 					for(int y = -Hardcoded.FOCUS_SIZE; y < Hardcoded.FOCUS_SIZE; ++y) {
 						int rad = Math.abs(x) + Math.abs(y);
 						if(rad > Hardcoded.FOCUS_SIZE) continue;
 						Position current_pos = new Position(x + i,y + j);
+						if(game_map.at(current_pos).structure != null && game_map.at(current_pos).structure.owner != game.me.id) {
+							num_dropoffs_them.add(rad);
+						}
 						MapCell game_at = game_map.at(game_map.normalize(current_pos));
 						double val;
 						if(game_at.ship != null || focus_positions.containsKey(current_pos)) {
@@ -106,11 +110,12 @@ public class GameState {
 				}
 				int distance_to_dropoff = game.gameMap.calculateDistance(pos, getClosestDropoff(pos));
 				
-				temp -= num_ships_me*Math.max(temp_distance, 15)*10;
-				temp -= num_ships_them*Math.max(temp_distance, 15)*10;
 				temp /= (max_rad*max_rad + (max_rad-1)*(max_rad-1));
 				temp *= Math.pow(Hardcoded.DROPOFF_DISTANCE_DISCOUNT, (distance_to_dropoff + 1));
 				temp *= Math.pow(Hardcoded.DISTANCE_DISCOUNT, (temp_distance+1));
+				for(Iterator<Integer> itr = num_dropoffs_them.iterator(); itr.hasNext();) {
+					temp*= (1 - Math.pow(.85, itr.next()));
+				}
 				if(temp > value) {
 					value = temp;
 					highest_concentration = game_map.normalize(new Position(pos.x + Hardcoded.FOCUS_SIZE/2, pos.y + Hardcoded.FOCUS_SIZE/2));
@@ -129,7 +134,7 @@ public class GameState {
         for(Iterator<MutableInteger> itr = dropoff_nums.iterator(); itr.hasNext();) {
         	MutableInteger next = itr.next();
         	next.val += 1;
-        	if(next.val >= 60) {
+        	if(next.val >= 80) {
         		itr.remove();
         	}
         }
@@ -143,7 +148,7 @@ public class GameState {
         		new_ship_controllers.get(ship.id).update(ship);
         		ship_controllers.remove(ship.id);
         	}else {
-        		new_ship_controllers.put(ship.id, new ShipController(ship));
+        		new_ship_controllers.put(ship.id, new ShipController(ship, this));
         	}
         	ShipController controller = new_ship_controllers.get(ship.id);
         	if(controller.state == State.FOCUSING) {
@@ -200,17 +205,12 @@ public class GameState {
         }
         
         int buffer = 0;
-        if(game.turnNumber >= Hardcoded.DROPPOINT_SAVE_TURN_MULTIPLIER * (Hardcoded.DROPPOINT_SAVE_TURN_NUMERATOR/game.gameMap.width)) {
+        if(dropoff_nums.size() == 0 && game.turnNumber >= ((double)(2 + (game.players.size()/2))/4) * Hardcoded.DROPPOINT_SAVE_TURN_MULTIPLIER * (Hardcoded.DROPPOINT_SAVE_TURN_NUMERATOR/game.gameMap.width)) {
         	buffer = Constants.DROPOFF_COST;
         }
         
-        int total_ships = 0;
-       	for(Player player : game.players) {
-       		total_ships += player.ships.size();
-       	}
-
         if (
-        	(total_halite / (total_ships+1))/(game.gameMap.width*game.gameMap.height * 1.0 / 1024.0) >= (1.4*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 100) / 100)) &&
+        	total_halite /((((double)(4+game.players.size())/3.0)*ship_controllers.size())+1) >= (1.6*Constants.SHIP_COST)/((double) (Math.max(Constants.MAX_TURNS - game.turnNumber, 200) / 200)) &&
             game.turnNumber <= Constants.MAX_TURNS * Hardcoded.LAST_SPAWN_TURN_MULTIPLIER &&
             ship_controllers.size() <= (Constants.MAX_TURNS - Hardcoded.MAX_BOT_NUMBER_SUBTRACTOR) * Hardcoded.MAX_BOT_NUMBER_MULTIPLIER &&
             turn_halite >= Constants.SHIP_COST  + buffer &&
@@ -218,7 +218,7 @@ public class GameState {
             )
         {
         	command_queue.add(game.me.shipyard.spawn());
-        	spawned = true;
+        	//spawned = true;
         }
 
         game.endTurn(command_queue);

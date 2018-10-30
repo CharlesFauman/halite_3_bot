@@ -29,6 +29,17 @@ public enum Direction {
             default: throw new IllegalStateException("Unknown direction " + this);
         }
     }
+    
+    public Direction turnRight() {
+    	 switch (this) {
+         case NORTH: return EAST;
+         case EAST: return SOUTH;
+         case SOUTH: return WEST;
+         case WEST: return NORTH;
+         case STILL: return STILL;
+         default: throw new IllegalStateException("Unknown direction " + this);
+     }
+    }
 
     Direction(final char charValue) {
         this.charValue = charValue;
