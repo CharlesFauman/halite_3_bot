@@ -2,6 +2,9 @@ package custom;
 
 // Potentially Optimizable
 public class Hardcoded {
+	
+	// TODO: change these constants based on map size + amount of opponents
+	
 	public final static int FOCUS_SIZE = 3;
 	public final static int RETURN_TURN_BUFFER = 5;
 	public final static int BAD_GATHERING_STREAK_SIZE = 20;
