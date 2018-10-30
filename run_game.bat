@@ -1,2 +1,4 @@
 javac MyBot.java
-halite.exe --replay-directory replays/ -vvv --width 64 --height 64 "java MyBot" "java MyBot" --seed 1540761683
+javac TestingBot1.java
+javac TestingBot2.java
+halite.exe --replay-directory replays/ -vvv --width 32 --height 32 "java MyBot" "java TestingBot2" --seed 1540761683
