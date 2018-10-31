@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 
+import com.sun.jndi.toolkit.ctx.PartialCompositeContext;
+
 import custom.ShipController.State;
 import hlt.Command;
 import hlt.Constants;
@@ -64,6 +66,10 @@ public class GameState {
 			}
 		}
 		return closest;
+	}
+	
+	public boolean alreadyAMove(Position pos) {
+		return focus_positions.containsKey(pos);
 	}
 
 	/**

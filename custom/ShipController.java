@@ -100,6 +100,10 @@ public class ShipController {
 		int limit = (int) (game_state.min_halite);
 
 		Position new_pos = game_state.game.gameMap.normalize(ship.position.directionalOffset(direction));
+		if (game_state.alreadyAMove(new_pos)) {
+			Log.log("Move " + direction + " runs into another ship, do not consider this direction...");
+			return 0;
+		}
 		boolean inspired = false;
 		int near_enemies = 0;
 
