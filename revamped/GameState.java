@@ -15,6 +15,11 @@ public class GameState {
 	
 	public void update() {
 		game.updateFrame();
+		
+		// decide what ship is going to do
+		
+		// decide if spawn ship
+		
 	}
 	
 }
