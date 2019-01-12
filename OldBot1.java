@@ -1,10 +1,13 @@
 // This Java API uses camelCase instead of the snake_case as documented in the API docs.
 //     Otherwise the names of methods are consistent.
-import hlt.Game;
-import revamped.*;
+import custom.GameState;
 
-public class MyBot {
+public class OldBot1 {
     public static void main(final String[] args) {
-        Game game = new Game();
+        final GameState game_state = new GameState();
+
+        while (true) {
+        	game_state.update();
+        }
     }
 }
